@@ -26,19 +26,72 @@ HTTPS = "https"
 
 URL_STATEMENT_PATH = "/v1/statement"
 
-HEADER_CATALOG = "X-Trino-Catalog"
-HEADER_SCHEMA = "X-Trino-Schema"
-HEADER_SOURCE = "X-Trino-Source"
-HEADER_USER = "X-Trino-User"
-HEADER_CLIENT_INFO = "X-Trino-Client-Info"
+class Headers:
 
-HEADER_SESSION = "X-Trino-Session"
-HEADER_SET_SESSION = "X-Trino-Set-Session"
-HEADER_CLEAR_SESSION = "X-Trino-Clear-Session"
+    @property
+    def base(self):
+        return f'X-{self.NAME}'
 
-HEADER_STARTED_TRANSACTION = "X-Trino-Started-Transaction-Id"
-HEADER_TRANSACTION = "X-Trino-Transaction-Id"
+    @property
+    def catalog(self):
+        return f'{self.base}-Catalog'
 
-HEADER_PREPARED_STATEMENT = 'X-Trino-Prepared-Statement'
-HEADER_ADDED_PREPARE = 'X-Trino-Added-Prepare'
-HEADER_DEALLOCATED_PREPARE = 'X-Trino-Deallocated-Prepare'
+    @property
+    def schema(self):
+        return f'{self.base}-Schema'
+
+    @property
+    def source(self):
+        return f'{self.base}-Source'
+
+    @property
+    def user(self):
+        return f'{self.base}-User'
+
+    @property
+    def client_info(self):
+        return f'{self.base}-Client-Info'
+
+    @property
+    def session(self):
+        return f'{self.base}-Session'
+
+    @property
+    def set_session(self):
+        return f'{self.base}-Set-Session'
+
+    @property
+    def clear_session(self):
+        return f'{self.base}-Clear-Session'
+
+    @property
+    def started_transaction_id(self):
+        return f'{self.base}-Started-Transaction-Id'
+
+    @property
+    def transaction(self):
+        return f'{self.base}-Transaction-Id'
+
+    @property
+    def prepared_statement(self):
+        return f'{self.base}-Prepared-Statement'
+
+    @property
+    def added_prepare(self):
+        return f'{self.base}-Added-Prepare'
+
+    @property
+    def deallocated_prepare(self):
+        return f'{self.base}-Deallocated-Prepare'
+
+
+class PrestoHeaders(Headers):
+    NAME = 'Presto'
+
+
+class TrinoHeaders(Headers):
+    NAME = 'Trino'
+
+
+def get_headers(presto_headers=False):
+    return PrestoHeaders() if presto_headers else TrinoHeaders()

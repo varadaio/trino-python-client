@@ -206,7 +206,8 @@ class TrinoRequest(object):
         max_attempts: int = MAX_ATTEMPTS,
         request_timeout: Union[float, Tuple[float, float]] = constants.DEFAULT_REQUEST_TIMEOUT,
         handle_retry=exceptions.RetryWithExponentialBackoff(),
-        verify: bool = True
+        verify: bool = True,
+        presto_headers = False,
     ) -> None:
         self._client_session = ClientSession(
             catalog,
@@ -227,6 +228,7 @@ class TrinoRequest(object):
         else:
             self._http_session = self.http.Session()
             self._http_session.verify = verify
+        self._headers_name = constants.get_headers(presto_headers=presto_headers)
         self._http_session.headers.update(self.http_headers)
         self._exceptions = self.HTTP_EXCEPTIONS
         self._auth = auth
@@ -252,28 +254,20 @@ class TrinoRequest(object):
 
     @property
     def http_headers(self) -> Dict[str, str]:
-        headers = {}
-
-        headers[constants.HEADER_CATALOG] = self._client_session.catalog
-        headers[constants.HEADER_SCHEMA] = self._client_session.schema
-        headers[constants.HEADER_SOURCE] = self._client_session.source
-        headers[constants.HEADER_USER] = self._client_session.user
-
-        headers[constants.HEADER_SESSION] = ",".join(
-            # ``name`` must not contain ``=``
-            "{}={}".format(name, value)
-            for name, value in self._client_session.properties.items()
-        )
+        headers = {
+            self._headers_name.catalog: self._client_session.catalog,
+            self._headers_name.schema: self._client_session.schema,
+            self._headers_name.source: self._client_session.source,
+            self._headers_name.user: self._client_session.user,
+            self._headers_name.session: ",".join("{}={}".format(name, value) for name, value in self._client_session.properties.items()),
+        }
 
         # merge custom http headers
         for key in self._client_session.headers:
             if key in headers.keys():
                 raise ValueError("cannot override reserved HTTP header {}".format(key))
         headers.update(self._client_session.headers)
-
-        transaction_id = self._client_session.transaction_id
-        headers[constants.HEADER_TRANSACTION] = transaction_id
-
+        headers[self._headers_name.transaction] = self._client_session.transaction_id
         return headers
 
     @property
@@ -386,18 +380,19 @@ class TrinoRequest(object):
         http_response.encoding = "utf-8"
         response = http_response.json()
         logger.debug("HTTP %s: %s", http_response.status_code, response)
+
         if "error" in response:
             raise self._process_error(response["error"], response.get("id"))
 
-        if constants.HEADER_CLEAR_SESSION in http_response.headers:
+        if self._headers_name.clear_session in http_response.headers:
             for prop in get_header_values(
-                http_response.headers, constants.HEADER_CLEAR_SESSION
+                http_response.headers, self._headers_name.clear_session
             ):
                 self._client_session.properties.pop(prop, None)
 
-        if constants.HEADER_SET_SESSION in http_response.headers:
+        if self._headers_name.set_session in http_response.headers:
             for key, value in get_session_property_values(
-                http_response.headers, constants.HEADER_SET_SESSION
+                http_response.headers, self._headers_name.set_session
             ):
                 self._client_session.properties[key] = value
 

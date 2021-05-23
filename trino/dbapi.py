@@ -76,7 +76,8 @@ class Connection(object):
         max_attempts=constants.DEFAULT_MAX_ATTEMPTS,
         request_timeout=constants.DEFAULT_REQUEST_TIMEOUT,
         isolation_level=IsolationLevel.AUTOCOMMIT,
-        verify=True
+        verify=True,
+        presto_headers=False
     ):
         self.host = host
         self.port = port
@@ -98,6 +99,7 @@ class Connection(object):
         self._isolation_level = isolation_level
         self._request = None
         self._transaction = None
+        self._presto_headers = presto_headers
 
     @property
     def isolation_level(self):
@@ -157,6 +159,7 @@ class Connection(object):
             self.redirect_handler,
             self.max_attempts,
             self.request_timeout,
+            presto_headers=self._presto_headers
         )
 
     def cursor(self):
@@ -189,6 +192,7 @@ class Cursor(object):
         self.arraysize = 1
         self._iterator = None
         self._query = None
+        self._headers_name = constants.get_headers(presto_headers=self._connection._presto_headers)
 
     def __iter__(self):
         return self._iterator
@@ -267,9 +271,9 @@ class Cursor(object):
         # until there are no more results
         for _ in result:
             response_headers = result.response_headers
-
-            if constants.HEADER_ADDED_PREPARE in response_headers:
-                return response_headers[constants.HEADER_ADDED_PREPARE]
+            
+            if self._headers_name.added_prepare in response_headers:
+                return response_headers[self._headers_name.added_prepare]
 
         raise trino.exceptions.FailedToObtainAddedPrepareHeader
 
@@ -344,7 +348,7 @@ class Cursor(object):
         query = trino.client.TrinoQuery(copy.deepcopy(self._request), sql=sql)
         result = query.execute(
             additional_http_headers={
-                constants.HEADER_PREPARED_STATEMENT: added_prepare_header
+                self._headers_name.prepared_statement: added_prepare_header
             }
         )
 
@@ -352,9 +356,9 @@ class Cursor(object):
         # until there are no more results
         for _ in result:
             response_headers = result.response_headers
-
-            if constants.HEADER_DEALLOCATED_PREPARE in response_headers:
-                return response_headers[constants.HEADER_DEALLOCATED_PREPARE]
+            
+            if self._headers_name.deallocated_prepare in response_headers:
+                return response_headers[self._headers_name.deallocated_prepare]
 
         raise trino.exceptions.FailedToObtainDeallocatedPrepareHeader
 
@@ -382,7 +386,7 @@ class Cursor(object):
                 )
                 result = self._query.execute(
                     additional_http_headers={
-                        constants.HEADER_PREPARED_STATEMENT: added_prepare_header
+                        self._headers_name.prepared_statement: added_prepare_header
                     }
                 )
             finally:
